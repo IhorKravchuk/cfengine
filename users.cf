@@ -1,0 +1,178 @@
+##############################################################################
+#                                                                            #
+#           USER MANAGEMENT AND login options                                #
+#                                                                            #
+#                                                                            #
+##############################################################################
+bundle agent manage_users
+{
+vars:
+# Users to create
+
+
+#Creating user Igor K
+"users[ingvar][fullname]" string => "Igor K";
+"users[ingvar][uid]" string => "1115";
+"users[ingvar][gid]" string => "10";
+"users[ingvar][home]" string => "/home/ingvar";
+"users[ingvar][shell]" string => "/bin/bash";
+"users[ingvar][flags]" string => "-m";
+"users[ingvar][password]" string => "$6$xjhsjkhhkjhjkhjkhhkjhjkhjkhkjhjkhssdsdDx84UYzbGwb0";
+"users[ingvar][id_rsa.pub]" string => "ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEkkkkkkkkkkkkkfkljfdjlkjlkjkljkljlkjhkhjklhjkljkljkljlkjkljkljkljdkljhjkhkljklhjkljlkjkljlk1Q== rsa-key-20120416";
+
+#Creating user Test User
+"users[testu][fullname]" string => "Test User";
+"users[testu][uid]" string => "1109";
+"users[testu][gid]" string => "10";
+"users[testu][home]" string => "/home/testu";
+"users[testu][shell]" string => "/bin/bash";
+"users[testu][flags]" string => "-m";
+"users[testu][password]" string => "$6$EuWdkjljdlkjlvnkldjkljfkldjlkjdkljkljkljlkjlkjlkj";
+"users[testu][id_rsa.pub]" string => "ssh-dss AAAAhljljdlkjlkgjdljklgjkljkljkljlkdjkljfkljlkjdflkjkljdlkjkldjklgjlkdjlkgjdkljgkljdklgjkldjklgjdkljgkldjklgjkldjgjdklj";
+
+
+#Creating user auto
+"users[auto][fullname]" string => "auto";
+"users[auto][uid]" string => "505";
+"users[auto][gid]" string => "100";
+"users[auto][home]" string => "/home/auto";
+"users[auto][shell]" string => "/bin/bash";
+"users[auto][flags]" string => "-m";
+"users[auto][password]" string => "!!";
+!server01::
+"users[auto][id_rsa.pub]" string => "ssh-dss AAAAB3Nzkfdhgjkhdkhkjghjkdhkjhjkghrhrihsklkjjskljgkljsjlkjskljflkjskljfjsljflsjljfklssjjsjdiojdlkjkljdlkjfklsjfldjlkdjlkj";
+server01::
+"users[auto][id_rsa.pub]" string => "ssh-dss AAAshkhjkfhdjkshjhfkjhskhkfhskjhjkhskjhfkjhskjhhskjhgjkghrhkhrkhkjhkjhuhckhxkhjkhkjhkjhsjkhkfjhlksjflkjslkjslkjlkfsjflkjskl";
+
+any::
+
+
+#Creating user nagios
+"users[nagios][fullname]" string => "nagios";
+"users[nagios][uid]" string => "501";
+"users[nagios][gid]" string => "500";
+"users[nagios][home]" string => "/home/nagios";
+"users[nagios][shell]" string => "/bin/bash";
+"users[nagios][flags]" string => "-m";
+"users[nagios][password]" string => "!!";
+"users[nagios][id_rsa.pub]" string => "";
+
+
+
+############## groups ############################
+
+"groups[freedom][gid]" string => "500";
+
+
+############### Users and Groups to remove ############################################
+## Won't delete users' home directory ##
+"users_to_delete" slist => {"yanik", "medved"};
+
+## Will delete users' home directory ##
+"users_to_delete_home" slist => {"putin"};
+
+"groups_to_delete" slist => {"lube"};
+
+methods:
+"groups_a" usebundle => create_groups("manage_users.groups");
+"users_a" usebundle => create_users("manage_users.users");
+"users_d" usebundle => delete_users("@(manage_users.users_to_delete)","");
+"users_dh" usebundle => delete_users("@(manage_users.users_to_delete_home)","-r");
+"groups_d" usebundle => delete_groups("@(manage_users.groups_to_delete)");
+}
+
+
+################# Creating groups ######################
+
+bundle agent create_groups(info)
+{
+vars:
+"group" slist => getindices("$(info)");
+classes:
+"add_$(group)" not => groupexists("$(group)");
+commands:
+# Adding group
+linux::
+"/usr/sbin/groupadd -g $($(info)[$(group)][gid]) $(group)"
+ifvarclass => "add_$(group)";
+reports:
+verbose_mode::
+"Created group $(group)"
+ifvarclass => "add_$(group)";
+}
+
+
+####### Creating USERS and keeping passwords and ssh-key###################
+
+
+bundle agent create_users(info)
+{
+vars:
+"user" slist => getindices("$(info)");
+classes:
+"add_$(user)" not => userexists("$(user)");
+commands:
+# Adding users
+linux::
+"/usr/sbin/useradd $($(info)[$(user)][flags]) -u $($(info)[$(user)][uid])
+-g $($(info)[$(user)][gid]) -d $($(info)[$(user)][home])
+-s $($(info)[$(user)][shell]) -c '$($(info)[$(user)][fullname])' -p '$($(info)[$(user)][password])' $(user)"
+ifvarclass => "add_$(user)";
+files:
+linux::
+# Update users only if it already exists ! 
+"/etc/shadow"
+        edit_line => set_user_field("$(user)", 2, "$($(info)[$(user)][password])"),
+        ifvarclass => "!add_$(user)";
+"$($(info)[$(user)][home])/.ssh/"
+        create => "true",
+        perms => mog("0700", "$($(info)[$(user)][uid])", "$($(info)[$(user)][gid])"),
+        ifvarclass => "!add_$(user)";
+
+"$($(info)[$(user)][home])/.ssh/authorized_keys"
+        create => "true",
+        perms => mog("0600", "$($(info)[$(user)][uid])", "$($(info)[$(user)][gid])"),
+        edit_line => append_if_no_line("$($(info)[$(user)][id_rsa.pub])"),
+        edit_defaults  => empty,
+        ifvarclass => "!add_$(user)";
+reports:
+verbose_mode::
+"Created user $(user)"
+ifvarclass => "add_$(user)";
+}
+
+
+######## Deleting users #################################################
+
+bundle agent delete_users(rm_user, rm_option)
+{
+classes:
+        "rm_$(rm_user)" expression => userexists("$(rm_user)");
+commands:
+        # removing users
+linux::
+        "/usr/sbin/userdel $(rm_option) $(rm_user)"
+        ifvarclass => "rm_$(rm_user)";
+reports:
+        verbose_mode::
+                "Removed user $(rm_user)"
+                ifvarclass => "rm_$(rm_user)";
+}
+
+
+######## Deleting groups ##################################################
+
+bundle agent delete_groups(rm_group)
+{
+classes:
+        "rm_$(rm_group)" expression => groupexists("$(rm_group)");
+commands:
+        # removing groups
+        linux::
+                "/usr/sbin/groupdel $(rm_group)"
+                ifvarclass => "rm_$(rm_group)";
+reports:
+        verbose_mode::
+                "Removed group $(rm_group)"
+                ifvarclass => "rm_$(rm_group)";
+}

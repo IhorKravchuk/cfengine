@@ -1,0 +1,149 @@
+
+#######################################################
+#
+# promises.cf
+#
+#######################################################
+
+body common control
+
+{
+version => "1.0.0";
+bundlesequence  => { 
+                   "update",
+                   "garbage_collection",
+                   "yum_setup",
+                   "system_setup"
+                   };
+
+inputs          => {
+                   "update.cf",
+                   "site.cf",
+                   "cfengine_stdlib.cf",
+                   "$(prod_or_test.system_setup_file)",
+		   "users.cf"
+                   };
+ignore_missing_bundles => "true";
+ignore_missing_inputs => "true";
+#syslog_host => $(g.sysloghost);
+#syslog_port => "514";
+}
+
+######################################################
+# General bundle for CF-wide issues 
+######################################################
+#######################################################
+# Garbage collection issues
+#######################################################
+
+bundle agent garbage_collection
+{
+files:
+
+  "$(sys.workdir)/outputs"
+
+    delete => tidy,
+    file_select => days_old("3"),
+    depth_search => recurse("inf");
+
+
+}
+
+#######################################################
+#  Control promises below
+#######################################################
+
+body agent control
+{
+# if default runtime is 5 mins we need this for long jobs
+ifelapsed => "15";
+# who could run cfagent agent 
+agentaccess => { "root" };
+# syslog facility for agent logging
+syslog => "true";
+agentfacility => "LOG_LOCAL0";
+#way agent will check if file was changed
+defaultcopytype => "digest";
+#network connection timout
+default_timeout => "10";
+}
+
+#######################################################
+
+body monitor control
+{
+forgetrate => "0.7";
+monitorfacility => "LOG_LOCAL0";
+}
+
+#######################################################
+
+body executor control
+
+{
+# Allow job to be excuted no more than 120 min
+#   agent_expireafter => "120";
+   smtpserver => $(g.relayhost);
+   splaytime => "1";
+   mailfrom => "cfengine@$(sys.fqhost)";
+   mailto => "ingvar@gmail.com";
+   mailmaxlines => "100";
+   exec_command => "$(sys.workdir)/bin/cf-agent -f failsafe.cf && $(sys.workdir)/bin/cf-agent";
+   schedule => { "Min03", "Min13", "Min23", "Min33", "Min43", "Min53" };
+   executorfacility => "LOG_LOCAL0";
+
+}
+
+#######################################################
+
+body reporter control
+
+{
+reports => { "performance", "classes", "last_seen", "monitor_history", "monitor_summary", "installed_software", "software_patches" };
+build_directory => "$(sys.workdir)/reports";
+report_output => "html";
+time_stamps => "true";
+}
+
+#######################################################
+
+body runagent control
+{
+   hosts => { $(g.policyhost) };
+   background_children => "true";
+   output_to_file => "true";
+
+}
+
+#######################################################
+# Server configuration
+#######################################################
+
+body server control 
+
+{
+allowconnects         => { "127.0.0.1" , "::1", "172.21.0.0/16", "172.31.0.0/16" };
+allowallconnects      => { "127.0.0.1" , "::1", "172.21.0.0/16", "172.31.0.0/16" };
+trustkeysfrom         => { "127.0.0.1" , "::1", "172.21.0.0/16", "172.31.0.0/16" };
+cfruncommand          => "$(sys.workdir)/bin/cf-agent";
+allowusers            => { "root" };
+#Do not log connections
+logallconnections => "false";
+serverfacility => "LOG_LOCAL0";
+}
+
+bundle server access_rules()
+{
+access:
+
+  "/var/cfengine/masterfiles"
+       admit   => { "127.0.0.1", "::1",  "172.21.0.0/16", "172.31.0.0/16" };
+
+#  "/usr/sbin/cf-agent"
+#       admit   => { "127.0.0.1", "::1", "172.21.0.0/16" };
+
+roles:
+
+  ".*"  authorize => { "root" };
+}
+

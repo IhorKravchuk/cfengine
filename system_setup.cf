@@ -1,0 +1,1169 @@
+bundle agent system_setup
+{
+
+vars:
+
+   any::
+   #############################################################################################
+   # Variables for sysctl.conf
+   #############################################################################################
+# Enable buffer-overflow protection
+      "sysctlvar[kernel.exec-shield]" string => "1";
+      "sysctlvar[kernel.randomize_va_space]" string => "1";
+# Don't allow source routed packets
+      "sysctlvar[net.ipv4.conf.all.accept_source_route]" string => "0";
+      "sysctlvar[net.ipv4.conf.default.accept_source_route]" string => "0";
+# Turn on reverse path filtering
+      "sysctlvar[net.ipv4.conf.all.rp_filter]" string => "1";
+      "sysctlvar[net.ipv4.conf.default.rp_filter]" string => "1";
+# Don't allow outsiders to alter the routing tables
+      "sysctlvar[net.ipv4.conf.all.accept_redirects]" string => "0";
+      "sysctlvar[net.ipv4.conf.all.secure_redirects]" string => "0";
+      "sysctlvar[net.ipv4.conf.default.accept_redirects]" string => "0";
+      "sysctlvar[net.ipv4.conf.default.secure_redirects]" string => "0";
+# Log spoofed, source routed, and redirect packets
+      "sysctlvar[net.ipv4.conf.all.log_martians]" string => "1";
+      "sysctlvar[net.ipv4.conf.default.log_martians]" string => "1";
+# Don't reply to broadcasts. Prevents joining a smurf attack
+      "sysctlvar[net.ipv4.icmp_echo_ignore_broadcasts]" string => "1";
+# Enable syncookies for SYN flood attack protection
+      "sysctlvar[net.ipv4.tcp_syncookies]" string => "1";
+# Enable protection for bad icmp error messages
+      "sysctlvar[net.ipv4.icmp_ignore_bogus_error_responses]" string => "1";
+# Don't pass traffic between networks or act as a router
+      "sysctlvar[net.ipv4.ip_forward]" string => "0";
+      "sysctlvar[net.ipv4.conf.all.send_redirects]" string => "0";
+      "sysctlvar[net.ipv4.conf.default.send_redirects]" string => "0";
+# Disable IPv6
+      "sysctlvar[net.ipv6.conf.all.disable_ipv6]" string => "1";
+#Controls the System Request debugging functionality of the kernel
+      "sysctlvar[kernel.sysrq]" string => "0";
+      "sysctlvar[fs.suid_dumpable]" string => "0";
+      "sysctlvar[kernel.core_uses_pid]" string => "1";
+      "sysctlvar[kernel.shmmax]" string => "2147483648";
+   #############################################################################################
+   # Variables for postfix
+   #############################################################################################
+   isnocserver::
+    "maincfg[mynetworks]" string => "127.0.0.0/8, $(g.netval)";
+    "maincfg[relayhost]" string => "$(g.nocrelayhost)";
+    "maincfg[debug_peer_level]" string => "2";
+   !isnocserver::
+    "maincfg[inet_interfaces]" string => "localhost";
+    "maincfg[mynetworks]" string => "127.0.0.0/8, $myhostname";
+    "maincfg[relayhost]" string => "$(g.relayhost)";
+    "maincfg[mydestination]" string => "$myhostname, localhost.$mydomain, localhost";
+   any::
+    "maincfg[queue_directory]" string => "/var/spool/postfix";
+    "maincfg[command_directory]" string => "/usr/sbin";
+    "maincfg[daemon_directory]" string => "/usr/libexec/postfix";
+    "maincfg[html_directory]" string => "no";
+    "maincfg[manpage_directory]" string => "/usr/share/man";
+    "maincfg[sample_directory]" string => "/usr/share/doc/postfix-2.2.10/samples";
+    "maincfg[readme_directory]" string => "/usr/share/doc/postfix-2.2.10/README_FILES";
+    "maincfg[sendmail_path]" string => "/usr/sbin/sendmail.postfix";
+    "maincfg[newaliases_path]" string => "/usr/bin/newaliases.postfix";
+    "maincfg[mailq_path]" string => "/usr/bin/mailq.postfix";
+    "maincfg[mail_owner]" string => "postfix";
+    "maincfg[setgid_group]" string => "postdrop";
+    "maincfg[myorigin]" string => "$myhostname";
+    "maincfg[mydomain]" string => "$(g.domain)";
+    "maincfg[local_recipient_maps]" string => "unix:passwd.byname $alias_maps";
+    "maincfg[unknown_local_recipient_reject_code]" string => "550";
+    "maincfg[alias_maps]" string => "hash:/etc/aliases";
+    "maincfg[alias_database]" string => "hash:/etc/aliases";
+    "maincfg[debug_peer_level]" string => "2";
+    "maincfg[debugger_command]" string => "PATH=/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin xxgdb $daemon_directory/$process_name $process_id & sleep 5";
+ 
+     "rh6_init[SINGLE]" string => "/sbin/sulogin";
+      "inittab_settings" slist => {"s0:2345:respawn:/sbin/agetty -L -f /etc/issueserial 9600 ttyS0 vt100", "~~:S:wait:/sbin/sulogin"};
+
+# Disabling SUID AND GUID
+      "suid_guid_to_disable" slist => {"/bin/ping6", "/sbin/mount.nfs", "/sbin/mount.nfs4", "/sbin/netreport", "/sbin/umount.nfs", "/sbin/umount.nfs4", "/usr/bin/chage", "/usr/bin/chfn", "/usr/bin/chsh", "/usr/bin/lockfile", "/usr/bin/rcp", "/usr/bin/rlogin", "/usr/bin/rsh", "/usr/bin/wall", "/usr/bin/write", "/usr/bin/Xorg", "/usr/kerberos/bin/ksu", "/usr/libexec/openssh/ssh-keysign", "/usr/lib/vte/gnome-pty-helper", "/usr/sbin/ccreds_validate", "/usr/sbin/suexec", "/usr/sbin/userisdnctl", "/usr/sbin/usernetctl"};
+
+# Disable services on el
+       "disable_services_el" slist => {"S97yum-updatesd", "S98avahi-daemon", "S98avahi-dnsconfd", "S26lm_sensors", "S90xfs", "S05kudzu", "S85gpm", "S04readahead_early", "S15mdmonitor", "S25pcscd", "S08mcstrans", "S98avahi-daemon", "S98avahi-dnsconfd", "S25cups", "S96readahead_later"};
+
+# Stop sevices on el
+        "stop_services_el" slist => {"avahi-dnsconfd", "avahi-daemon", "yum-updatesd"};
+	
+# Cron files and floders permissions
+	"cron_files" slist =>{"/etc/crontab", "/etc/cron.hourly/", "/etc/cron.daily/", "/etc/cron.weekly/", "/etc/cron.monthly/", "/etc/cron.d/"};
+
+# Misc  
+     "os_components" slist => { "sshd", "syslog", "crond", "snmpd" };
+
+   net_iface_bond0::
+     "main_ip" string => "$(sys.ipv4[bond0])";
+   !net_iface_bond0::
+     "main_ip" string => "$(sys.ipv4[eth0])";
+
+
+methods:
+"user_management" usebundle => manage_users;
+
+
+classes:
+   el5|el6::
+      "md5_passwd" expression => regline(".*md5","/etc/sysconfig/authconfig");
+
+   any::
+      "vmware_guest" expression  => returnszero("/bin/grep -qi vmware /proc/scsi/scsi","noshell");
+
+
+commands:
+
+      "/sbin/ldconfig"
+         contain => silent,
+         ifvarclass => "fix_libs_paths";
+   
+      "/etc/init.d/postfix"
+         args => "restart",
+         contain => silent,
+         ifvarclass => "restart_postfix";
+   
+      "/etc/init.d/snmpd"
+         args => "restart",
+         contain => silent,
+         ifvarclass => "restart_snmpd";
+
+      "/etc/init.d/sshd"
+         args => "restart",
+         contain => silent,
+         ifvarclass => "restart_sshd";
+   
+      "/etc/init.d/syslog"
+         args => "restart",
+         contain => silent,
+         ifvarclass => "restart_syslog";
+   
+      "/etc/init.d/rsyslog"
+         args => "restart",
+         contain => silent,
+         ifvarclass => "restart_rsyslog";
+
+
+      "/etc/init.d/ntpd stop;ntpdate $(g.ntphost1);/etc/init.d/ntpd start"
+         contain => in_shell,
+         ifvarclass => "restart_ntpd";
+   
+      "/etc/init.d/crond"
+         args => "restart",
+         contain => silent,
+         ifvarclass => "restart_crond";
+
+      "/sbin/sysctl"
+         args => "-p",
+         contain => silent,
+         ifvarclass => "apply_new_kparms";
+   
+# switch to sha512 hash algorithm
+      "/usr/sbin/authconfig"
+         args => "--passalgo=sha512 --updateall",         
+	 contain => silent,
+         ifvarclass => "md5_passwd";
+         
+
+# Enabling services
+      "/sbin/chkconfig"
+         args => "snmpd on",
+         contain => silent,
+         ifvarclass => "restart_snmpd";
+
+# Clean repo if old claudera repo was there
+
+      "/usr/bin/yum"
+         args => "clean all",
+         contain => silent,
+         ifvarclass => "clean_repo";
+
+processes:
+
+   "$(os_components)"
+      restart_class => canonify("restart_$(os_components)");
+
+#Stop  unused and disabled services
+el5|el6::
+    "$(stop_services_el)"
+	signals => { "term" , "kill" };
+
+# Stopping ntpd on virtual hosts
+(el5|el6).vmware_guest.!isnocserver::
+   "ntpd"
+        process_stop => "/etc/init.d/ntpd stop";
+
+
+packages:
+
+   "net-snmp"
+      package_version => "5.5",
+      package_select => ">=",
+      package_policy => "add",
+      package_method => yum_rpm,
+      package_architectures => { "$(sys.arch)" };
+
+   "openssh"
+      package_version => "5.3",
+      package_select => ">=",
+      package_policy => "update",
+      package_method => yum_rpm,
+      package_architectures => { "$(sys.arch)" };
+
+   "openssh-server"
+      package_version => "5.3",
+      package_select => ">=",
+      package_policy => "update",
+      package_method => yum_rpm,
+      package_architectures => { "$(sys.arch)" };
+
+   "openssh-clients"
+      package_version => "5.3",
+      package_select => ">=",
+      package_policy => "update",
+      package_method => yum_rpm,
+      package_architectures => { "$(sys.arch)"};
+
+   "redhat-lsb"
+      package_version => "3.0",
+      package_select => ">=",
+      package_policy => "add",
+      package_method => yum_rpm,
+      package_architectures => { "$(sys.arch)" };
+
+   "logwatch"
+      package_version => "1",
+      package_select => ">=",
+      package_policy => "delete",
+      package_method => yum_rpm;
+
+   "cfengine-community"
+      package_version => "3.4.3",
+      package_select => ">=",
+      package_policy => "add",
+      package_method => yum_rpm,
+      package_architectures => { "$(sys.arch)" }; 
+
+files:
+
+   #############################################################################################
+   # Give cf-engine and host status on login
+   #############################################################################################
+any::
+  "/etc/motd"
+
+      comment           => "Edit motd file",
+      create            => "true",
+      edit_line         => set_motd,
+      edit_defaults     => empty;
+
+   #############################################################################################
+   # Disable SUID and SGID Binaries section
+   #############################################################################################
+el5|el6:: 
+  "$(suid_guid_to_disable)"
+
+      comment           => "Disable SUIDs and GUIDs",
+      create            => "false",
+      perms		=> m("a-s,g-s");
+
+   #############################################################################################
+   # Sudo section
+   #############################################################################################
+any:: 
+  "/etc/sudoers"
+
+      comment		=> "Setup sudoers file",
+      create		=> "true",
+      edit_line 	=> set_sudoers,
+      edit_defaults	=> std_defs;
+
+   #############################################################################################
+   # Disable unused services on Enterprise Linux based systems section
+   #############################################################################################
+
+el5|el6:: 
+     "/etc/rc3.d/$(disable_services_el)"
+	rename => disable;
+
+# Disable ntp on virtual centos
+
+(el5|el6).vmware_guest.!isnocserver::
+     "/etc/rc3.d/S58ntpd"
+      rename => disable;
+
+   #############################################################################################
+   # PAM section
+   #############################################################################################
+el5|el6:: 
+  "/etc/pam.d/su"
+
+      comment           => "Setup pam.d su file",
+      create            => "false",
+      edit_line         => uncomment_lines_matching("auth.*required.*pam_wheel.so use_uid","#"),
+      edit_defaults     => std_defs;
+
+  "/etc/pam.d/system-auth"
+
+      comment           => "Set password quality requiment and lockouts",
+      create            => "false",
+      edit_line         => edit_system_auth;
+
+   #############################################################################################
+   # CRON section
+   #############################################################################################
+el5|el6:: 
+  "$(cron_files)"
+
+      comment           => "changing perm and owner on cron files and floders",
+      create            => "false",
+      perms     	=> mog("go-rwx", "root", "root");
+
+   #############################################################################################
+   # Naming services section
+   #############################################################################################
+#!dev_qa::
+#   "$(sys.resolv)"
+#
+#      comment		=> "Ensure a consistent resolver configuration",
+#      create		=> "true",
+#      edit_line 	=> resolver,
+#     edit_defaults	=> std_defs;
+any::
+   "/etc/nsswitch.conf"
+
+      comment		=> "Modify resolving order for naming services",
+      edit_line		=> setNamingServices,
+      edit_defaults	=> std_defs;
+
+   "/etc/hosts"
+
+      comment		=> "Fix the host files",
+      create		=> "true",
+      edit_line 	=> fix_hosts,
+      edit_defaults	=> std_defs;
+
+   #############################################################################################
+   # Banner section
+   #############################################################################################
+   "/etc/issue"
+
+      comment		=> "Give a warning to users logging in the console",
+      create		=> "true",
+      edit_line		=> issue,
+      edit_defaults	=> std_defs;
+
+   "/etc/issue.net"
+
+      comment		=> "Give a warning to users logging in remotely",
+      create		=> "true",
+      edit_line		=> issue_net,
+      edit_defaults	=> std_defs;
+
+   #############################################################################################
+   # Inittab section
+   #############################################################################################
+el5::
+   "/etc/inittab"
+
+      comment		=> "Enabling console and single user mode protection in inittab",
+      edit_line		=> append_if_no_line("$(inittab_settings)"),
+      edit_defaults	=> std_defs;
+   #############################################################################################
+   # Init section (umask) and single user mode in Centos6
+   #############################################################################################
+el5::
+   "/etc/sysconfig/init"
+
+      comment           => "Set Daemon umask",
+      edit_line         => append_if_no_line("umask 022"),
+      edit_defaults     => std_defs;
+el6::
+   "/etc/sysconfig/init"
+
+      comment           => "Single mode protection",
+      edit_line         => set_variable_values("system_setup.rh6_init"),
+      edit_defaults     => std_defs;
+
+   #############################################################################################
+   # Disable core dumps
+   #############################################################################################
+any::
+   "/etc/security/limits.conf"
+
+      comment           => "Disable core dumpe",
+      edit_line         => append_if_no_line("* hard core 0"),
+      edit_defaults     => std_defs;
+
+
+
+   #############################################################################################
+   # NTP date section virtual hosts
+   #############################################################################################
+(el5|el6).vmware_guest.!isnocserver:: 
+  "/etc/cron.d/ntpdate"
+
+      comment		=> "Setting time sinc by cron",
+      edit_line		=> append_if_no_line("15 * * * * root /usr/sbin/ntpdate $(g.ntphost1) >/dev/null 2>&1"),
+      create            => "true",
+      edit_defaults	=> empty;
+
+   #############################################################################################
+   # NTP section physical hosts
+   #############################################################################################
+!vmware_guest|isnocserver::
+   "/etc/ntp.conf"
+      comment           => "Setting time service",
+      edit_line         => setTimeService,
+      classes           => if_repaired("restart_ntpd"),
+      edit_defaults     => empty;
+
+   #############################################################################################
+   # Console tweaking section
+   #############################################################################################
+any::
+   "/etc/securetty"
+
+      comment		=> "Add the serial port to the list of consoles for root login",
+      edit_line		=> append_if_no_line("ttyS0"),
+      edit_defaults	=> std_defs;
+
+
+   #############################################################################################
+   # Modules section
+   #############################################################################################
+   "/etc/modprobe.d/disable_ipv6.conf"
+
+      comment           => "Disable IPV6",
+      create            => "true",
+      edit_line         => disable_ipv6,
+      edit_defaults     => std_defs;
+
+
+   #############################################################################################
+   # SElinux section
+   #############################################################################################
+   "/etc/selinux/config"
+
+      comment           => "Disable SElinux",
+      edit_line         => disable_selinux,
+      edit_defaults     => std_defs;
+
+
+   #############################################################################################
+   # Kernel tweaking section
+   #############################################################################################
+   "/etc/sysctl.conf"
+
+      comment		=> "Modify sysctl.conf according to specs",
+      edit_line		=> set_variable_values("system_setup.sysctlvar"),
+      classes		=> if_repaired("apply_new_kparms"),
+      edit_defaults	=> std_defs;
+
+   #############################################################################################
+   # Syslogd tweaking section
+   #############################################################################################
+el5::
+   "/etc/syslog.conf"
+
+       comment         => "Configure syslog for QRadar log duplication",
+       create          => "true",
+       edit_line       => set_SyslogConfig,
+       classes         => if_repaired("restart_syslog"),
+       edit_defaults   => std_defs;
+el6::
+   "/etc/rsyslog.conf"
+       comment         => "Configure rsyslog for QRadar log duplication",
+       edit_line       => set_SyslogConfig,
+       classes         => if_repaired("restart_rsyslog"),
+       edit_defaults   => std_defs;
+
+   #############################################################################################
+   # Cron section
+   #############################################################################################
+any::
+   "/etc/cron.daily/logfiles"
+
+      comment		=> "Create a log cleaning cron",
+      create		=> "true",
+      perms             => m("755"),
+      edit_line		=> createLogCron,
+      edit_defaults	=> std_defs;
+
+   #############################################################################################
+   # General system configuration section
+   #############################################################################################
+   "/etc/sysconfig/i18n"
+
+      comment		=> "Create a system wide i18n profile",
+      create		=> "true",
+      edit_line		=> set_i18n,
+      edit_defaults	=> std_defs;
+
+   "/etc/sysconfig/selinux"
+
+      comment		=> "Create a system wide selinux profile",
+      create		=> "true",
+      edit_line		=> set_selinuxConfig,
+      edit_defaults	=> std_defs;
+
+   "/etc/sysconfig/syslog"
+
+      comment		=> "Configure syslog for postfix",
+      create		=> "true",
+      edit_line		=> set_Syslog,
+      edit_defaults	=> std_defs;
+
+   "/etc/sysconfig/sysstat"
+
+      comment		=> "Configure sysstat",
+      create		=> "true",
+      edit_line		=> setSysstat,
+      edit_defaults	=> std_defs;
+
+   #############################################################################################
+   # SNMP configuration section
+   #############################################################################################
+   "/etc/snmp/snmpd.conf"
+
+      comment		=> "Configure SNMP service",
+      create		=> "true",
+      edit_line		=> setSNMPconfig,
+      classes		=> if_repaired("restart_snmpd"),
+      edit_defaults	=> empty;
+      
+   #############################################################################################
+   # Postfix configuration section
+   #############################################################################################
+   "/etc/postfix/main.cf"
+
+      comment           => "Configure postfix main.cf",
+      edit_line         => set_variable_values("system_setup.maincfg"),
+      classes		=> if_repaired("restart_postfix"),
+      edit_defaults	=> empty;
+
+   "/etc/postfix/master.cf"
+
+      comment		=> "Configure postfix master.cf",
+      create		=> "true",
+      edit_line		=> postfix_master,
+      classes		=> if_repaired("restart_postfix"),
+      edit_defaults	=> std_defs;
+ 
+   #############################################################################################
+   # SSHD tweaking section
+   #############################################################################################
+   "/etc/ssh/sshd_config"
+
+      comment		=> "Set SSH daemon configuration",
+      edit_line		=> setSSHDConfig,
+      classes		=> if_repaired("restart_sshd"),
+      edit_defaults	=> empty;
+}
+
+bundle agent yum_setup
+{
+
+files:
+   #############################################################################################
+   # YUM section
+   #############################################################################################
+     centos_5|centos_5_x64|centos_6|centos_6_x64::
+
+      "/etc/yum.repos.d/CentOS-Base.repo"
+         comment	=> "Edit the CentOS-Base.repo file",
+         create		=> "true",
+         edit_line	=> yum_centos_base_repo("$(g.yumhost)"),
+         edit_defaults	=> empty;
+
+      "/etc/yum.repos.d/CentOS-Media.repo"
+         comment	=> "Edit the CentOS-Media.repo file",
+         create		=> "true",
+         edit_line	=> yum_centos_media_repo("$(g.yumhost)"),
+         edit_defaults	=> std_defs;
+
+      "/etc/yum.repos.d/CentOS-Debuginfo.repo"
+         comment        => "Edit the CentOS-Debuginfo.repo file",
+         create         => "false",
+         edit_line      => yum_centos_debuginfo_repo("$(g.yumhost)"),
+         edit_defaults  => empty;
+
+      "/etc/yum.repos.d/CentOS-Vault.repo"
+         comment        => "Edit the CentOS-Vault.repo file",
+         create         => "false",
+         edit_line      => yum_centos_vault_repo("$(g.yumhost)"),
+         edit_defaults  => empty;
+
+   redhat_5|redhat_5_x64::
+
+      "/etc/yum.repos.d/RHEL-Base.repo"
+         comment	=> "Edit the RHEL-Base.repo file",
+         create		=> "true",
+         edit_line	=> yum_rhel5_base_repo("$(g.yumhost)"),
+         edit_defaults	=> empty;
+
+
+   any::
+
+      "/etc/cron.daily/yum"
+   
+         comment	=> "Delete the scheduled update file",
+         delete		=> tidy;
+   
+      "/etc/cron.daily/yum.cron"
+   
+         comment	=> "Delete the scheduled update file",
+         delete		=> tidy;
+   
+      "/etc/yum.repos.d/epel.repo"
+   
+         comment	=> "Create the Operations YUM repository",
+         create		=> "true",
+         edit_line	=> yum_epel_repo("$(g.yumhost)"),
+         edit_defaults	=> empty;
+   
+      "/etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL.txt"
+
+         comment           => "EPEL GPG key",
+         copy_from         => my_copy("$(sys.workdir)/inputs/keys/RPM-GPG-KEY-EPEL.txt"),
+         perms             => m("644"),
+         action            => immediate;
+
+
+}
+
+bundle edit_line setTimeService
+{
+insert_lines:
+   any::
+       "#========================
+# Managed by CFEngine
+#========================";
+   isnocserver::
+       "restrict default kod nomodify notrap nopeer noquery";
+   any::
+       "restrict 127.0.0.1";
+       "restrict -6 ::1";
+   isnocserver::
+       "restrict 172.0.0.0 mask 255.0.0.0 nomodify notrap";
+       "server 0.pool.ntp.org";
+       "server 1.pool.ntp.org";
+       "server 2.pool.ntp.org";
+       "server 3.pool.ntp.org";
+   !isnocserver::
+       "server $(g.ntphost1)";
+       "server $(g.ntphost2)";
+   any::
+       "driftfile /var/lib/ntp/drift";
+}
+
+bundle edit_line set_motd
+{
+insert_lines:
+
+   "====================================";
+   " Managed by Cfengine ver $(sys.cf_version)";
+   " Last Run at $(sys.date)";
+   " cfengine master server: $(g.policyhost)";
+   " System $(sys.flavor)  $(sys.arch)";
+   "==================================== ";
+}
+
+
+bundle edit_line set_sudoers
+{
+
+replace_patterns:
+
+   "# (\Wwheel\s+ALL=\(ALL\)\s+ALL.*)"
+      replace_with => comment("%wheel        ALL=(ALL)       ALL");
+
+}
+
+bundle edit_line fix_hosts
+{
+vars:
+#      "host_names[127.0.0.1]" string => "localhost localhost.localdomain";
+#      "host_names[$(system_setup.main_ip)]" string => "$(sys.host) $(sys.host).$(g.domain)";
+#      "myIp" slist => {"127.0.0.1", "$(system_setup.main_ip)"};
+
+	"myIp" slist => {"$(system_setup.main_ip)"};
+delete_lines:
+   "$(myIp).*"
+     comment => "Deleting lines starting with: $(myIp)";
+
+#insert_lines:
+#   "$(myIp)		$(host_names[$(myIp)])"
+#      comment => "Inserting line $(myIp)		$(host_names[$(myIp)]) into /etc/hosts";
+}
+
+bundle edit_line setSysstat
+{
+
+field_edits:
+   "HISTORY=.*"
+      edit_field => mycol("=","2"," ","14","set");
+
+}
+
+bundle edit_line set_SyslogConfig
+{
+
+delete_lines:
+   ipv4_172.21::
+    '.*kiev01siem.test.com';
+insert_lines:
+   ipv4_172.210::
+    'auth.*,authpriv.*,local3.*                                     @kiev01siem.test.com';
+}
+
+bundle edit_line set_Syslog
+{
+
+delete_lines:
+   "SYSLOGD_OPTIONS=.*";
+   "KLOGD_OPTIONS=.*";
+
+insert_lines:
+   'SYSLOGD_OPTIONS="-m 0 -a /var/spool/postfix/dev/log"';
+   'KLOGD_OPTIONS="-c 4 -x"';
+}
+
+bundle edit_line set_selinuxConfig
+{
+
+delete_lines:
+   "SELINUX=.*";
+   "SELINUXTYPE=.*";
+
+insert_lines:
+   "SELINUX=disabled";
+   "SELINUXTYPE=targeted";
+
+}
+
+
+bundle edit_line createLogCron
+{
+delete_lines:
+
+insert_lines:
+
+   "#!/bin/sh
+find /logs/. -type f -name '*.log*' -mtime +14 -exec rm -f {} \;
+# End of script";
+
+}
+
+bundle edit_line set_i18n
+{
+
+delete_lines:
+
+   'LANG="en.*"';
+
+insert_lines:
+
+   'LANG="C"';
+
+}
+
+bundle edit_line setSNMPconfig
+{
+insert_lines:
+
+   "###########################################
+# Managed by CFengine, please do NOT edit #
+###########################################
+agentaddress $(system_setup.main_ip)
+com2sec RPsnmp $(g.snmphosts) test2
+group RPgroup v2c RPsnmp
+view systemview included .1
+access RPgroup \"\" v2c noauth exact systemview none none
+access RPgroup \"\" usm auth   exact systemview none none
+trapcommunity test2
+trapsink $(g.snmpmain)
+trap2sink $(g.snmpmain)
+informsink $(g.snmpmain)
+authtrapenable 2
+load 3 5 5
+ignoredisk none
+ignoredisk tmpfs
+ignoredisk devpts
+ignoredisk sysfs
+ignoredisk proc
+includeAllDisks 10%
+proc snmpd 1 1
+sysName $(sys.host)
+sysDescr Linux System
+sysLocation $(g.env) $(g.zone)
+sysContact noc@test.com
+sysServices 72
+master agentx
+smuxpeer .1.3.6.1.4.1.674.10892.1";
+
+}
+
+bundle edit_line setSSHDConfig
+{
+
+insert_lines:
+
+   "###########################################
+# Managed by CFengine, please do NOT edit #
+###########################################
+Port 22
+Protocol 2
+AddressFamily inet
+ServerKeyBits 1024
+LogLevel INFO
+SyslogFacility AUTHPRIV
+PermitRootLogin yes
+PermitEmptyPasswords no
+UsePrivilegeSeparation yes
+StrictModes yes
+MaxAuthTries 3
+LoginGraceTime 1m
+MaxStartups 10:30:60
+RhostsRSAAuthentication no
+HostbasedAuthentication no
+IgnoreRhosts yes
+PasswordAuthentication yes
+ChallengeResponseAuthentication no
+PubkeyAuthentication yes
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials yes
+UsePAM yes
+Banner /etc/issue.net
+X11Forwarding no
+X11DisplayOffset 10
+PrintMotd yes
+TCPKeepAlive yes
+ClientAliveInterval 60
+ClientAliveCountMax 3
+Subsystem sftp internal-sftp";
+
+}
+
+bundle edit_line setNamingServices
+{
+vars:
+   "services" slist => { "passwd","shadow","group" };
+   "host_order" string => "files dns";
+
+field_edits:
+
+   "$(services):.*"
+      edit_field => mycol(":","2"," ","files","set");
+
+   "hosts:.*"
+      edit_field => mycol(":","2"," ",$(host_order),"set");
+
+}
+
+body edit_field mycol(split,col,sep,newval,method)
+{
+   field_separator	=> "$(split)";
+   select_field		=> "$(col)";
+   value_separator	=> " ";
+   field_value		=> "$(newval)";
+   field_operation	=> "$(method)";
+   extend_fields	=> "true";
+}
+
+
+
+
+bundle edit_line yum_centos_base_repo(yumhost)
+{
+delete_lines:
+
+insert_lines:
+any::
+   "###########################################";
+   "# Managed by CFengine, please do NOT edit #";
+   "########################################### ";
+   "
+[base]
+name=CentOS-$releasever - Base
+baseurl=http://$(yumhost)/distrib/CentOS/$releasever/os/$basearch/
+gpgcheck=0
+enabled=1
+
+#released updates
+[updates]
+name=CentOS-$releasever - Updates
+baseurl=http://$(yumhost)/distrib/CentOS/$releasever/updates/$basearch/
+gpgcheck=0
+enabled=1
+
+#additional packages that may be useful
+[extras]
+name=CentOS-$releasever - Extras
+baseurl=http://$(yumhost)/distrib/CentOS/$releasever/extras/$basearch/
+gpgcheck=0
+enabled=1
+
+#additional packages that extend functionality of existing packages
+[centosplus]
+name=CentOS-$releasever - Plus
+baseurl=http://$(yumhost)/distrib/CentOS/$releasever/centosplus/$basearch/
+gpgcheck=0
+enabled=0
+"
+insert_type => "preserve_block";
+
+!centos_6.!centos_6_x64::
+"
+#packages used/produced in the build but not released
+[addons]
+name=CentOS-$releasever - Addons
+baseurl=http://$(yumhost)/distrib/CentOS/$releasever/addons/$basearch/
+gpgcheck=0
+enabled=1
+
+"
+insert_type => "preserve_block";
+
+
+}
+
+bundle edit_line yum_centos_media_repo(yumhost)
+{
+replace_patterns:
+
+   "enabled=1.*"
+      replace_with => value("enabled=0");
+}
+
+bundle edit_line yum_centos_debuginfo_repo(yumhost)
+{
+replace_patterns:
+
+   "enabled=1.*"
+      replace_with => value("enabled=0");
+}
+
+bundle edit_line yum_centos_vault_repo(yumhost)
+{
+replace_patterns:
+
+   "enabled=1.*"
+      replace_with => value("enabled=0");
+}
+
+
+bundle edit_line yum_rhel5_base_repo(yumhost)
+{
+delete_lines:
+
+insert_lines:
+
+   "###########################################";
+   "# Managed by CFengine, please do NOT edit #";
+   "########################################### ";
+   "
+[base]
+name=RHEL-$releasever - Base
+baseurl=http://$(yumhost)/distrib/RedHat/EL5/en/os/$basearch/4/Server/
+gpgcheck=0
+enabled=1
+
+#released updates
+[updates]
+name=RedHat-$releasever - Updates
+baseurl=http://$(yumhost)/distrib/RedHat/EL5/en/updates/$basearch/
+gpgcheck=0
+enabled=0
+
+#packages used/produced in the build but not released
+[addons]
+name=RedHat-$releasever - Addons
+baseurl=http://$(yumhost)/distrib/RedHat/EL5/en/addons/$basearch/
+gpgcheck=0
+enabled=0 
+
+#additional packages that may be useful
+[extras]
+name=RedHat-$releasever - Extras
+baseurl=http://$(yumhost)/distrib/RedHat/EL5/en/extras/$basearch/
+gpgcheck=0
+enabled=0  
+";
+
+}
+
+bundle edit_line yum_epel_repo(yumhost)
+{
+delete_lines:
+
+insert_lines:
+
+   "###########################################";
+   "# Managed by CFengine, please do NOT edit #";
+   "########################################### ";
+   "
+[epel]
+name=Extra Packages for Enterprise Linux $releasever - $basearch
+baseurl=http://$(yumhost)/distrib/epel/$releasever/$basearch
+failovermethod=priority
+enabled=1
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL.txt
+";
+
+}
+
+
+
+
+bundle edit_line issue
+{
+vars:
+   "issue_text" string =>
+   "
+#####################################################################
+#   WARNING: Unauthorized access to this system is forbidden,       #
+#   will be monitored and logged and will be prosecuted by law.     #
+#   By accessing this system, you agree that your actions will      #
+#   be monitored and logged for any unauthorized usage or actions.  #
+#####################################################################
+";
+
+delete_lines:
+
+   ".*";
+
+insert_lines:
+
+   "$(issue.issue_text)";
+
+}
+
+bundle edit_line issue_net
+{
+vars:
+   "issue_text" string =>
+   "
+#####################################################################
+#    WARNING - All activity is monitored and logged in Real-time    #
+#####################################################################
+#                                                                   #
+# UNAUTHORIZED ACCESS INTO FOREIGN SYSTEMS IS PUNISHABLE BY LAW,    #
+# ACCORDING TO THE COMPUTER FRAUD AND ABUSE ACT. LEGAL ACTIONS WILL #
+# BE TAKEN AGAINST OFFENDERS.                                       #
+#                                                                   #
+#####################################################################
+";
+
+delete_lines:
+
+   ".*";
+
+insert_lines:
+
+   "$(issue_net.issue_text)";
+
+}
+
+
+bundle edit_line resolver
+{
+
+delete_lines:
+   "search.*";
+   "nameserver.*";
+   "domain.*";
+
+insert_lines:
+
+      "search $(g.domain)" location => start;
+      "nameserver $(g.dns1)";
+      "nameserver $(g.dns2)";
+
+}
+
+bundle edit_line postfix_master
+{
+vars:
+   "pfServices" slist => { "smtp", "pickup", "cleanup", "qmgr", "tlsmgr", "rewrite", "bounce",
+                           "defer", "trace", "verify", "flush", "proxymap", "smtp", "relay",
+                           "showq", "error", "discard", "lmtp", "anvil", "scache" };
+field_edits:
+   "$(pfServices).*"
+      edit_field => mycol("\s+","5","       ","y","set");
+
+}
+bundle edit_line disable_ipv6
+{
+
+insert_lines:
+
+	"options ipv6 disable=1" location => start;
+
+}
+
+bundle edit_line disable_selinux
+{
+
+delete_lines:
+
+        "SELINUX=.*";
+        "\n";
+
+insert_lines:
+
+        "SELINUX=disabled";
+
+}
+
+#    Edit system-auth file
+
+bundle edit_line edit_system_auth
+{
+
+insert_lines:
+ "account     required      pam_tally2.so"
+        location => acc_tally2;
+
+replace_patterns:
+ "password[ \t]*requisite[ \t]*pam_cracklib.so[ \t]*try_first_pass[ \t]*retry=3.*"
+        replace_with => value("password    required      pam_passwdqc.so min=disabled,disabled,12,8,8 max=32 passphrase=2 match=4 similar=deny random=32 enforce=everyone retry=5");
+
+ "auth[ \t]*sufficient[ \t]*pam_unix.so[ \t]*nullok[ \t]*try_first_pass"
+        replace_with => value("auth        required      pam_unix.so nullok try_first_pass");
+
+ "auth[ \t]*requisite[ \t]*pam_succeed_if.so.*"
+        replace_with => value("auth        sufficient    pam_tally2.so deny=10 onerr=fail unlock_time=1350");
+}
+
+body location acc_tally2
+
+{
+select_line_matching => "account[ \t]*required[ \t]*pam_unix.so";
+before_after => "before";
+}
+
+
+
+###########################################################
+
+body copy_from my_copy(source)
+{
+   type_check => "true";
+   copy_backup => "false";
+   source => "$(source)";
+}
+
+body file_select postfix_libs
+{
+   leaf_name => { "libnss_.*.so.*", "libresolv.*.so.*", "libdb.*.so.*" };
+   file_result => "leaf_name";
+}
+
+
+body classes system_change(class) 
+{
+   promise_repaired => { "$(class)" };
+}
+
+# End of file
